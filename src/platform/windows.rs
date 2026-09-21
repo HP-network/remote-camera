@@ -186,7 +186,6 @@ fn probe_target(now: Instant) {
     if target != runtime.target {
         runtime.target = target;
         let changed = runtime.engine.target_changed(target);
-        sync_engine(runtime);
         if changed && runtime.options.verbose {
             println!(
                 "target={}",
@@ -198,6 +197,7 @@ fn probe_target(now: Instant) {
             );
         }
     }
+    sync_engine(runtime);
 }
 
 fn reload_config_if_changed(now: Instant) {
