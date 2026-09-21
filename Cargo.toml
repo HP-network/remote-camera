@@ -1,0 +1,32 @@
+[package]
+name = "remote-camera"
+version = "0.3.0"
+edition = "2021"
+rust-version = "1.71"
+description = "A version-independent Windows companion for stable Minecraft Java camera input over Remote Desktop"
+license = "MIT"
+repository = "https://github.com/HP-network/remote-camera"
+readme = "README.md"
+keywords = ["minecraft", "remote-desktop", "rdp", "mouse", "windows"]
+categories = ["games", "os::windows-apis"]
+default-run = "remote-camera"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+panic = "abort"
+strip = "symbols"
+
+[lints.rust]
+unsafe_op_in_unsafe_fn = "warn"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61.2", features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Gdi",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Threading",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_WindowsAndMessaging"
+] }
