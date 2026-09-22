@@ -32,8 +32,17 @@ Remote Camera 的兼容边界在 Windows 输入层，而不在 Minecraft 的 Jav
 
 Windows x64 用户可以直接下载 [remote-camera.exe](https://github.com/HP-network/remote-camera/releases/download/v0.5.0/remote-camera.exe)，校验文件为 [remote-camera-windows-x64.sha256](https://github.com/HP-network/remote-camera/releases/download/v0.5.0/remote-camera-windows-x64.sha256)。
 
-1. 把 `remote-camera.exe` 放在远程 Windows 主机上。
-2. 在同一个远程桌面会话中启动它，再启动 Minecraft Java Edition。
+拓扑必须是：
+
+```text
+控制端（发起 RDP 连接的电脑）
+        │
+        └── RDP ──> 被控端（运行 Windows 和 Minecraft 的电脑）
+                          └── remote-camera.exe 在这里运行
+```
+
+1. 把 `remote-camera.exe` 放在被控端，而不是控制端。
+2. 在被控端的同一个 RDP 用户会话中启动它，再启动 Minecraft Java Edition。
 3. 进入世界后按 F8 开启或停用稳定器。
 4. 如果使用了非标准启动器标题，在配置中修改 `title_contains`；如果 Java 进程名不同，修改 `process_names`。
 
@@ -131,12 +140,14 @@ This is **not a Minecraft mod**. It does not require Fabric, Forge, NeoForge, Li
 
 Download the Windows x64 executable from the [v0.5.0 release](https://github.com/HP-network/remote-camera/releases/tag/v0.5.0) and verify it with the published SHA-256 file.
 
+Run `remote-camera.exe` on the **controlled Windows host where Minecraft runs**, inside the same RDP user session. Running it on the controlling/client computer cannot intercept input delivered to the controlled host.
+
 Press F8 to toggle the filter and F9 to exit. The default configuration is `%APPDATA%\\RemoteCamera\\config.cfg`; set `require_rdp=false` to test on a local desktop. The default `target_scope=desktop` covers the RDP session; use `target_scope=minecraft` for a game-only filter. `--dry-run`, `--verbose`, and `--print-config` are available for diagnosis. Build with `cargo build --release --locked` on Windows. The non-Windows build is a harmless stub for tests and documentation only.
 
 ## 限制
 
 - 仅支持 Windows 交互式桌面；Linux/macOS 不提供同等输入 API。
-- 需要在目标 RDP 交互式会话中运行；服务会话、锁屏和 UAC 安全桌面不会处理。
+- 必须在运行 Minecraft 的被控端 RDP 交互式会话中运行；在控制端运行不会拦截被控端的输入。服务会话、锁屏和 UAC 安全桌面不会处理。
 - Minecraft 模式依赖前台标题中的 `Minecraft`，这是为了避免误伤其他应用；桌面模式会有意覆盖整个 RDP 虚拟桌面。
 - Minecraft 模式不支持 Bedrock Edition；Java 客户端被重命名时需要调整目标规则。桌面模式不检查 Minecraft 进程。
 - 这是输入兼容工具，不是对 RDP 编码、网络延迟或游戏帧率的修复。
