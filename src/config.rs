@@ -28,7 +28,7 @@ impl Default for Config {
             enabled_on_start: true,
             require_rdp: true,
             recenter_cursor: true,
-            target_scope: "minecraft".to_owned(),
+            target_scope: "desktop".to_owned(),
             title_contains: "minecraft".to_owned(),
             process_names: vec!["javaw.exe".to_owned(), "java.exe".to_owned()],
             min_cutoff: 1.2,
@@ -294,6 +294,11 @@ mod tests {
         assert_eq!(parsed.beta, original.beta);
         assert_eq!(parsed.target_scope, original.target_scope);
         assert_eq!(parsed.process_names, original.process_names);
+    }
+
+    #[test]
+    fn new_install_defaults_to_desktop_scope() {
+        assert_eq!(Config::default().target_scope, "desktop");
     }
 
     #[test]

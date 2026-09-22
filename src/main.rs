@@ -23,7 +23,7 @@ fn print_help() {
     println!("  -h, --help       show this help");
     println!("  -V, --version    show the version");
     println!();
-    println!("F8 toggles the stabilizer. F9 exits. target_scope=minecraft is the default; target_scope=desktop covers the RDP desktop.");
+    println!("F8 toggles the stabilizer. F9 exits. target_scope=desktop is the default; target_scope=minecraft limits handling to Minecraft.");
 }
 
 fn main() {
