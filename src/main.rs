@@ -12,7 +12,7 @@ use platform::RunOptions;
 
 fn print_help() {
     println!("Remote Camera {}", env!("CARGO_PKG_VERSION"));
-    println!("Windows companion for stable Minecraft Java camera input over RDP");
+    println!("Windows companion for stable RDP desktop mouse input");
     println!();
     println!("Usage: remote-camera [options]");
     println!("  --config <path>  use a specific config file");
@@ -23,7 +23,7 @@ fn print_help() {
     println!("  -h, --help       show this help");
     println!("  -V, --version    show the version");
     println!();
-    println!("F8 toggles the stabilizer. F9 exits. The tool does not install a Minecraft mod.");
+    println!("F8 toggles the stabilizer. F9 exits. target_scope=minecraft is the default; target_scope=desktop covers the RDP desktop.");
 }
 
 fn main() {

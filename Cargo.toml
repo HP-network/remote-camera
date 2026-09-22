@@ -1,9 +1,9 @@
 [package]
 name = "remote-camera"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 rust-version = "1.71"
-description = "A version-independent Windows companion for stable Minecraft Java camera input over Remote Desktop"
+description = "A version-independent Windows companion for stable mouse input over Remote Desktop"
 license = "MIT"
 repository = "https://github.com/HP-network/remote-camera"
 readme = "README.md"

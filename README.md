@@ -1,14 +1,14 @@
 # Remote Camera
 
-在 Windows 远程桌面里运行 Minecraft Java Edition 时，鼠标相对移动可能被 RDP 的绝对坐标和屏幕边缘限制打乱，结果就是视角乱飞、突然反向或转到边缘停住。
+在 Windows 远程桌面里，RDP 的绝对坐标和屏幕边缘限制可能把相对鼠标移动打乱，结果就是 Minecraft 视角乱飞、突然反向，或光标转到边缘停住。
 
-Remote Camera 是一个独立的 Windows companion tool：它在远程主机上观察前台的 Minecraft 窗口，过滤抖动和异常跳变，再把稳定的相对移动送回当前窗口。核心算法与 Windows 输入后端分离，方便测试、审计和后续增加其他桌面后端。
+Remote Camera 是一个独立的 Windows companion tool：默认观察远程主机上的 Minecraft 前台窗口，也可以覆盖整个 RDP 虚拟桌面，过滤抖动和异常跳变，再把稳定的相对移动送回桌面。核心算法与 Windows 输入后端分离，方便测试、审计和后续增加其他桌面后端。
 
 **它不是 Minecraft Mod。** 不需要 Fabric、Forge、NeoForge、LiteLoader 或任何其他加载器，也不读取 Java 内存。因此它不绑定 Minecraft 版本，原则上适用于仍使用 Java Edition 窗口输入的旧版和新版客户端。
 
 ## 兼容范围
 
-Remote Camera 的兼容边界在 Windows 输入层，而不在 Minecraft 的 Java API：它不加载游戏类、不依赖 mappings，也不针对某个客户端版本编译。因此 **Minecraft Java Edition 1.0 至当前版本都使用同一套 `.exe`**，不需要按版本下载不同文件。
+Remote Camera 的兼容边界在 Windows 输入层，而不在 Minecraft 的 Java API：它不加载游戏类、不依赖 mappings，也不针对某个客户端版本编译。因此 **Minecraft Java Edition 1.0 至当前版本都使用同一套 `.exe`**；桌面模式也不依赖 Minecraft 版本。
 
 默认目标规则是前台窗口标题包含 `Minecraft`，进程名为 `java.exe` 或 `javaw.exe`。这是 Mojang/第三方启动器在旧版和新版 Java 客户端上共同保留的桌面边界。改过窗口标题或使用非标准 Java 进程名时，可以通过 `title_contains` 和 `process_names` 调整，而不需要改代码或重新编译。
 
@@ -17,6 +17,7 @@ Remote Camera 的兼容边界在 Windows 输入层，而不在 Minecraft 的 Jav
 ## 功能
 
 - 对 RDP 会话自动启用，也可以在配置中允许本地桌面运行
+- `target_scope=minecraft` 默认只处理 Minecraft 前台窗口；`target_scope=desktop` 可处理整个 RDP 虚拟桌面
 - F8 快速开关，F9 立即退出
 - One-Euro 自适应滤波：低速时稳，高速转向时保留响应
 - deadzone 去除 RDP 微抖，max delta / max output 限制瞬时跳变
@@ -29,7 +30,7 @@ Remote Camera 的兼容边界在 Windows 输入层，而不在 Minecraft 的 Jav
 
 ## 使用
 
-Windows x64 用户可以直接下载 [remote-camera.exe](https://github.com/HP-network/remote-camera/releases/download/v0.3.0/remote-camera.exe)，校验文件为 [remote-camera-windows-x64.sha256](https://github.com/HP-network/remote-camera/releases/download/v0.3.0/remote-camera-windows-x64.sha256)。
+Windows x64 用户可以直接下载 [remote-camera.exe](https://github.com/HP-network/remote-camera/releases/download/v0.4.0/remote-camera.exe)，校验文件为 [remote-camera-windows-x64.sha256](https://github.com/HP-network/remote-camera/releases/download/v0.4.0/remote-camera-windows-x64.sha256)。
 
 1. 把 `remote-camera.exe` 放在远程 Windows 主机上。
 2. 在同一个远程桌面会话中启动它，再启动 Minecraft Java Edition。
@@ -47,6 +48,7 @@ Windows x64 用户可以直接下载 [remote-camera.exe](https://github.com/HP-n
 enabled_on_start=true
 require_rdp=true
 recenter_cursor=true
+target_scope=minecraft
 title_contains=minecraft
 process_names=javaw.exe,java.exe
 min_cutoff=1.2
@@ -62,6 +64,8 @@ config_reload_secs=5
 ```
 
 `require_rdp=false` 会允许在普通本地桌面测试。`min_cutoff` 控制低速平滑程度，`beta` 控制高速运动时提高响应的幅度；先调整 `deadzone`，再微调 `sensitivity`。不要把 `max_delta` 和 `max_output` 设得过大，否则会重新放大远程桌面的跳变。
+
+`target_scope=desktop` 使用 Windows 虚拟桌面的中心点，不再检查窗口标题和 Java 进程。它只应在专用 RDP 会话中使用；启用后会影响该会话里的其他桌面应用，按 F8 可立即停用。
 
 ## 架构
 
@@ -121,18 +125,18 @@ cargo build --release --locked
 
 ## English
 
-Remote Camera is a standalone Windows companion for the Minecraft Java Edition mouse problem that appears in RDP sessions. RDP can turn relative mouse input into absolute cursor jumps, edge locking, and sudden camera spins. The tool watches the foreground Minecraft window, removes small jitter and implausible jumps, recenters the cursor, and injects a bounded relative movement.
+Remote Camera is a standalone Windows companion for unstable mouse input in RDP sessions. RDP can turn relative mouse input into absolute cursor jumps, edge locking, and sudden camera spins. By default the tool watches the foreground Minecraft window, removes small jitter and implausible jumps, recenters the cursor, and injects a bounded relative movement. Set `target_scope=desktop` to apply the same bounded filter to the whole RDP virtual desktop.
 
 This is **not a Minecraft mod**. It does not require Fabric, Forge, NeoForge, LiteLoader, or a particular game version. It works outside the JVM and targets the Windows desktop input path, so the same executable can be used across Java Edition versions as long as the foreground window title contains `Minecraft`.
 
-Download the Windows x64 executable from the [v0.3.0 release](https://github.com/HP-network/remote-camera/releases/tag/v0.3.0) and verify it with the published SHA-256 file.
+Download the Windows x64 executable from the [v0.4.0 release](https://github.com/HP-network/remote-camera/releases/tag/v0.4.0) and verify it with the published SHA-256 file.
 
-Press F8 to toggle the filter and F9 to exit. The default configuration is `%APPDATA%\\RemoteCamera\\config.cfg`; set `require_rdp=false` to test on a local desktop. `--dry-run`, `--verbose`, and `--print-config` are available for diagnosis. Build with `cargo build --release --locked` on Windows. The non-Windows build is a harmless stub for tests and documentation only.
+Press F8 to toggle the filter and F9 to exit. The default configuration is `%APPDATA%\\RemoteCamera\\config.cfg`; set `require_rdp=false` to test on a local desktop. Use `target_scope=desktop` only when the RDP session itself should be covered. `--dry-run`, `--verbose`, and `--print-config` are available for diagnosis. Build with `cargo build --release --locked` on Windows. The non-Windows build is a harmless stub for tests and documentation only.
 
 ## 限制
 
 - 仅支持 Windows 交互式桌面；Linux/macOS 不提供同等输入 API。
-- 需要与 Minecraft 位于同一个远程会话；服务会话、锁屏和 UAC 安全桌面不会处理。
-- 窗口识别依赖前台标题中的 `Minecraft`，这是为了避免误伤其他应用。
-- 不支持 Bedrock Edition；Java 客户端被重命名时需要调整目标规则。
+- 需要在目标 RDP 交互式会话中运行；服务会话、锁屏和 UAC 安全桌面不会处理。
+- 默认窗口识别依赖前台标题中的 `Minecraft`，这是为了避免误伤其他应用；桌面模式会有意覆盖整个 RDP 虚拟桌面。
+- Minecraft 模式不支持 Bedrock Edition；Java 客户端被重命名时需要调整目标规则。桌面模式不检查 Minecraft 进程。
 - 这是输入兼容工具，不是对 RDP 编码、网络延迟或游戏帧率的修复。

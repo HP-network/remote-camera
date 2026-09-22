@@ -6,6 +6,7 @@ pub struct Config {
     pub enabled_on_start: bool,
     pub require_rdp: bool,
     pub recenter_cursor: bool,
+    pub target_scope: String,
     pub title_contains: String,
     pub process_names: Vec<String>,
     pub min_cutoff: f64,
@@ -27,6 +28,7 @@ impl Default for Config {
             enabled_on_start: true,
             require_rdp: true,
             recenter_cursor: true,
+            target_scope: "minecraft".to_owned(),
             title_contains: "minecraft".to_owned(),
             process_names: vec!["javaw.exe".to_owned(), "java.exe".to_owned()],
             min_cutoff: 1.2,
@@ -109,6 +111,7 @@ impl Config {
             ("enabled_on_start", self.enabled_on_start.to_string()),
             ("require_rdp", self.require_rdp.to_string()),
             ("recenter_cursor", self.recenter_cursor.to_string()),
+            ("target_scope", self.target_scope.clone()),
             ("title_contains", self.title_contains.clone()),
             ("process_names", self.process_names.join(",")),
             ("min_cutoff", self.min_cutoff.to_string()),
@@ -133,6 +136,10 @@ impl Config {
         if self.title_contains.is_empty() {
             self.title_contains = "minecraft".to_owned();
         }
+        self.target_scope = match self.target_scope.trim().to_ascii_lowercase().as_str() {
+            "desktop" | "rdp" | "all" => "desktop".to_owned(),
+            _ => "minecraft".to_owned(),
+        };
         self.process_names = self
             .process_names
             .iter()
@@ -168,6 +175,7 @@ impl Config {
             "enabled_on_start" => self.enabled_on_start = parse_bool(value)?,
             "require_rdp" => self.require_rdp = parse_bool(value)?,
             "recenter_cursor" => self.recenter_cursor = parse_bool(value)?,
+            "target_scope" => self.target_scope = value.to_owned(),
             "title_contains" => self.title_contains = value.to_owned(),
             "process_names" => {
                 self.process_names = value.split(',').map(str::trim).map(str::to_owned).collect()
@@ -274,6 +282,7 @@ mod tests {
     fn config_text_round_trips_core_values() {
         let original = Config {
             beta: 0.11,
+            target_scope: "desktop".to_owned(),
             process_names: vec!["java.exe".to_owned()],
             ..Config::default()
         };
@@ -283,6 +292,17 @@ mod tests {
         }
         parsed.sanitize();
         assert_eq!(parsed.beta, original.beta);
+        assert_eq!(parsed.target_scope, original.target_scope);
         assert_eq!(parsed.process_names, original.process_names);
+    }
+
+    #[test]
+    fn unknown_target_scope_falls_back_to_minecraft() {
+        let mut config = Config {
+            target_scope: "anything".to_owned(),
+            ..Config::default()
+        };
+        config.sanitize();
+        assert_eq!(config.target_scope, "minecraft");
     }
 }

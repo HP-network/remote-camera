@@ -18,7 +18,8 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
     CallNextHookEx, DispatchMessageW, GetClientRect, GetForegroundWindow, GetSystemMetrics,
     GetWindowTextW, GetWindowThreadProcessId, PeekMessageW, SetCursorPos, SetWindowsHookExW,
     TranslateMessage, UnhookWindowsHookEx, HC_ACTION, HHOOK, LLMHF_INJECTED, MSG, MSLLHOOKSTRUCT,
-    PM_REMOVE, SM_REMOTESESSION, WH_MOUSE_LL, WM_MOUSEMOVE, WM_QUIT,
+    PM_REMOVE, SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_REMOTESESSION, SM_XVIRTUALSCREEN,
+    SM_YVIRTUALSCREEN, WH_MOUSE_LL, WM_MOUSEMOVE, WM_QUIT,
 };
 
 use crate::config::Config;
@@ -144,7 +145,7 @@ unsafe extern "system" fn mouse_hook(code: i32, wparam: WPARAM, lparam: LPARAM) 
         if event.flags & LLMHF_INJECTED == 0 {
             let runtime = runtime_mut();
             if let Some(target) = runtime.target {
-                if unsafe { GetForegroundWindow() } as usize != target.id {
+                if target.id != 0 && unsafe { GetForegroundWindow() } as usize != target.id {
                     return unsafe { CallNextHookEx(null_mut(), code, wparam, lparam) };
                 }
                 if runtime.engine.state() == EngineState::Tracking {
@@ -190,7 +191,7 @@ fn probe_target(now: Instant) {
             println!(
                 "target={}",
                 if target.is_some() {
-                    "minecraft"
+                    runtime.config.target_scope.as_str()
                 } else {
                     "none"
                 }
@@ -230,7 +231,11 @@ fn sync_engine(runtime: &mut Runtime) {
 }
 
 fn window_target(window: HWND) -> Option<TargetWindow> {
-    if window.is_null() || !is_minecraft_window(window) {
+    let runtime = runtime_ref();
+    if runtime.config.target_scope == "desktop" {
+        return virtual_desktop_target();
+    }
+    if window.is_null() || !is_target_window(window) {
         return None;
     }
     let mut rect = RECT::default();
@@ -251,8 +256,26 @@ fn window_target(window: HWND) -> Option<TargetWindow> {
     })
 }
 
-fn is_minecraft_window(window: HWND) -> bool {
+fn virtual_desktop_target() -> Option<TargetWindow> {
+    let width = unsafe { GetSystemMetrics(SM_CXVIRTUALSCREEN) };
+    let height = unsafe { GetSystemMetrics(SM_CYVIRTUALSCREEN) };
+    if width <= 0 || height <= 0 {
+        return None;
+    }
+    let left = unsafe { GetSystemMetrics(SM_XVIRTUALSCREEN) };
+    let top = unsafe { GetSystemMetrics(SM_YVIRTUALSCREEN) };
+    Some(TargetWindow {
+        id: 0,
+        center_x: left.saturating_add(width / 2),
+        center_y: top.saturating_add(height / 2),
+    })
+}
+
+fn is_target_window(window: HWND) -> bool {
     let runtime = runtime_ref();
+    if runtime.config.target_scope == "desktop" {
+        return true;
+    }
     let mut title = [0u16; 512];
     let length = unsafe { GetWindowTextW(window, title.as_mut_ptr(), title.len() as i32) };
     if length <= 0 {
