@@ -285,28 +285,36 @@ fn is_target_window(window: HWND) -> bool {
     if runtime.config.target_scope == "desktop" {
         return true;
     }
+    let mut pid = 0;
+    if unsafe { GetWindowThreadProcessId(window, &mut pid) } == 0 {
+        return false;
+    }
+    let Some(name) = process_name(pid) else {
+        return false;
+    };
+    if !runtime
+        .config
+        .process_names
+        .iter()
+        .any(|allowed| allowed == &name)
+    {
+        return false;
+    }
+
+    // "minecraft" is the historical default, but localized launchers and
+    // custom clients often replace the window title entirely. The Java
+    // process filter is the reliable boundary in that case. A non-default
+    // title remains available as an explicit stricter filter.
+    if runtime.config.title_contains == "minecraft" {
+        return true;
+    }
     let mut title = [0u16; 512];
     let length = unsafe { GetWindowTextW(window, title.as_mut_ptr(), title.len() as i32) };
     if length <= 0 {
         return false;
     }
     let title = String::from_utf16_lossy(&title[..length as usize]).to_ascii_lowercase();
-    if !title.contains(&runtime.config.title_contains) {
-        return false;
-    }
-    let mut pid = 0;
-    if unsafe { GetWindowThreadProcessId(window, &mut pid) } == 0 {
-        return false;
-    }
-    process_name(pid)
-        .map(|name| {
-            runtime
-                .config
-                .process_names
-                .iter()
-                .any(|allowed| allowed == &name)
-        })
-        .unwrap_or(false)
+    runtime.config.title_contains.is_empty() || title.contains(&runtime.config.title_contains)
 }
 
 fn process_name(pid: u32) -> Option<String> {
