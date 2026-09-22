@@ -39,6 +39,7 @@ struct Runtime {
     last_config_check: Instant,
     config_modified: Option<std::time::SystemTime>,
     target: Option<TargetWindow>,
+    recenter_guard: bool,
 }
 
 struct HookGuard(HHOOK);
@@ -76,6 +77,7 @@ pub fn run(config: Config, options: RunOptions) {
         last_config_check: now,
         config_modified: None,
         target: None,
+        recenter_guard: false,
     });
     let runtime = Box::leak(runtime) as *mut Runtime;
     let _ = RUNTIME.set(runtime as usize);
@@ -148,6 +150,9 @@ unsafe extern "system" fn mouse_hook(code: i32, wparam: WPARAM, lparam: LPARAM) 
         // commonly arrive through the same injected-input path.
         if event.dwExtraInfo != INJECTED_TAG {
             let runtime = runtime_mut();
+            if runtime.recenter_guard {
+                return unsafe { CallNextHookEx(null_mut(), code, wparam, lparam) };
+            }
             if let Some(target) = runtime.target {
                 if target.id != 0 && unsafe { GetForegroundWindow() } as usize != target.id {
                     return unsafe { CallNextHookEx(null_mut(), code, wparam, lparam) };
@@ -159,8 +164,13 @@ unsafe extern "system" fn mouse_hook(code: i32, wparam: WPARAM, lparam: LPARAM) 
                             .on_cursor_position(event.pt.x, event.pt.y, Instant::now());
                     if let Some(output) = output {
                         if output.recenter && !runtime.options.dry_run {
-                            set_cursor(target.center_x, target.center_y);
+                            // SetCursorPos can synchronously re-enter this hook.
+                            // Arm the engine and guard before moving the cursor so
+                            // that the recenter event cannot feed back as input.
                             runtime.engine.on_recenter_complete(Instant::now());
+                            runtime.recenter_guard = true;
+                            set_cursor(target.center_x, target.center_y);
+                            runtime.recenter_guard = false;
                         }
                         let has_motion =
                             output.motion.dx.abs() >= 0.5 || output.motion.dy.abs() >= 0.5;

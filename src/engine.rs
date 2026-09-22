@@ -110,22 +110,30 @@ impl CameraEngine {
             });
         }
 
-        let (dx, dy) = if self.config.recenter_cursor {
-            (
-                x.saturating_sub(target.center_x),
-                y.saturating_sub(target.center_y),
-            )
-        } else {
-            let previous = self.last_cursor.replace((x, y));
-            let Some((previous_x, previous_y)) = previous else {
-                return Some(OutputMotion {
-                    motion: Motion::default(),
-                    recenter: false,
-                    swallow: true,
-                });
-            };
-            (x.saturating_sub(previous_x), y.saturating_sub(previous_y))
+        // Remote desktop clients report absolute positions. Use the delta
+        // between source events so a repeated position is not injected again
+        // after the cursor is recentered.
+        let Some((previous_x, previous_y)) = self.last_cursor.or_else(|| {
+            self.config
+                .recenter_cursor
+                .then_some((target.center_x, target.center_y))
+        }) else {
+            self.last_cursor = Some((x, y));
+            return Some(OutputMotion {
+                motion: Motion::default(),
+                recenter: false,
+                swallow: true,
+            });
         };
+        self.last_cursor = Some((x, y));
+        let (dx, dy) = (x.saturating_sub(previous_x), y.saturating_sub(previous_y));
+        if dx == 0 && dy == 0 {
+            return Some(OutputMotion {
+                motion: Motion::default(),
+                recenter: false,
+                swallow: true,
+            });
+        }
         if dx.unsigned_abs() > self.config.max_delta as u32 * 4
             || dy.unsigned_abs() > self.config.max_delta as u32 * 4
         {
@@ -236,5 +244,26 @@ mod tests {
         assert!(second.motion.dx > 0.0);
         assert!(second.motion.dy < 0.0);
         assert!(!second.recenter);
+    }
+
+    #[test]
+    fn recenter_mode_does_not_repeat_a_stable_absolute_position() {
+        let mut engine = engine();
+        engine.target_changed(Some(TargetWindow {
+            id: 9,
+            center_x: 100,
+            center_y: 100,
+        }));
+        let now = Instant::now();
+        let first = engine.on_cursor_position(100, 100, now).unwrap();
+        assert_eq!(first.motion, Motion::default());
+        let second = engine
+            .on_cursor_position(112, 100, now + Duration::from_millis(8))
+            .unwrap();
+        assert!(second.motion.dx > 0.0);
+        let repeated = engine
+            .on_cursor_position(112, 100, now + Duration::from_millis(16))
+            .unwrap();
+        assert_eq!(repeated.motion, Motion::default());
     }
 }

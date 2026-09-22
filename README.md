@@ -30,7 +30,7 @@ Remote Camera 的兼容边界在 Windows 输入层，而不在 Minecraft 的游�
 
 ## 使用
 
-Windows x64 用户可以直接下载 [remote-camera.exe](https://github.com/HP-network/remote-camera/releases/download/v0.6.4/remote-camera.exe)，校验文件为 [remote-camera-windows-x64.sha256](https://github.com/HP-network/remote-camera/releases/download/v0.6.4/remote-camera-windows-x64.sha256)。
+Windows x64 用户可以直接下载 [remote-camera.exe](https://github.com/HP-network/remote-camera/releases/download/v0.6.5/remote-camera.exe)，校验文件为 [remote-camera-windows-x64.sha256](https://github.com/HP-network/remote-camera/releases/download/v0.6.5/remote-camera-windows-x64.sha256)。
 
 拓扑必须是：
 
@@ -138,7 +138,7 @@ Remote Camera is a standalone Windows companion for unstable mouse input on a co
 
 This is **not a Minecraft mod**. It does not require Fabric, Forge, NeoForge, LiteLoader, or a particular game version. It works outside the game runtime and targets the Windows desktop input path, so the same executable can be used across Java Edition and Windows Bedrock versions. The default process filter also works with localized and custom window titles.
 
-Download the Windows x64 executable from the [v0.6.4 release](https://github.com/HP-network/remote-camera/releases/tag/v0.6.4) and verify it with the published SHA-256 file.
+Download the Windows x64 executable from the [v0.6.5 release](https://github.com/HP-network/remote-camera/releases/tag/v0.6.5) and verify it with the published SHA-256 file.
 
 Run `remote-camera.exe` on the **controlled Windows host where Minecraft runs**, inside the same interactive user session. Running it on the controlling/client computer cannot intercept input delivered to the controlled host.
 
