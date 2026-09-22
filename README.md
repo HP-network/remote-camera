@@ -29,6 +29,8 @@ Remote Camera 的兼容边界在 Windows 输入层，而不在 Minecraft 的 Jav
 
 ## 使用
 
+Windows x64 用户可以直接下载 [remote-camera.exe](https://github.com/HP-network/remote-camera/releases/download/v0.3.0/remote-camera.exe)，校验文件为 [remote-camera-windows-x64.sha256](https://github.com/HP-network/remote-camera/releases/download/v0.3.0/remote-camera-windows-x64.sha256)。
+
 1. 把 `remote-camera.exe` 放在远程 Windows 主机上。
 2. 在同一个远程桌面会话中启动它，再启动 Minecraft Java Edition。
 3. 进入世界后按 F8 开启或停用稳定器。
@@ -122,6 +124,8 @@ cargo build --release --locked
 Remote Camera is a standalone Windows companion for the Minecraft Java Edition mouse problem that appears in RDP sessions. RDP can turn relative mouse input into absolute cursor jumps, edge locking, and sudden camera spins. The tool watches the foreground Minecraft window, removes small jitter and implausible jumps, recenters the cursor, and injects a bounded relative movement.
 
 This is **not a Minecraft mod**. It does not require Fabric, Forge, NeoForge, LiteLoader, or a particular game version. It works outside the JVM and targets the Windows desktop input path, so the same executable can be used across Java Edition versions as long as the foreground window title contains `Minecraft`.
+
+Download the Windows x64 executable from the [v0.3.0 release](https://github.com/HP-network/remote-camera/releases/tag/v0.3.0) and verify it with the published SHA-256 file.
 
 Press F8 to toggle the filter and F9 to exit. The default configuration is `%APPDATA%\\RemoteCamera\\config.cfg`; set `require_rdp=false` to test on a local desktop. `--dry-run`, `--verbose`, and `--print-config` are available for diagnosis. Build with `cargo build --release --locked` on Windows. The non-Windows build is a harmless stub for tests and documentation only.
 
