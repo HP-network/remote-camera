@@ -16,5 +16,5 @@ pub use windows::run;
 
 #[cfg(not(windows))]
 pub fn run(_config: Config, _options: RunOptions) {
-    eprintln!("remote-camera is a Windows companion tool. Build it on Windows to enable the RDP input backend.");
+    eprintln!("remote-camera is a Windows companion tool. Build it on Windows to enable the remote-control input backend.");
 }

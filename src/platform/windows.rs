@@ -17,9 +17,9 @@ use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     CallNextHookEx, DispatchMessageW, GetClientRect, GetForegroundWindow, GetSystemMetrics,
     GetWindowTextW, GetWindowThreadProcessId, PeekMessageW, SetCursorPos, SetWindowsHookExW,
-    TranslateMessage, UnhookWindowsHookEx, HC_ACTION, HHOOK, LLMHF_INJECTED, MSG, MSLLHOOKSTRUCT,
-    PM_REMOVE, SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_REMOTESESSION, SM_XVIRTUALSCREEN,
-    SM_YVIRTUALSCREEN, WH_MOUSE_LL, WM_MOUSEMOVE, WM_QUIT,
+    TranslateMessage, UnhookWindowsHookEx, HC_ACTION, HHOOK, MSG, MSLLHOOKSTRUCT, PM_REMOVE,
+    SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_REMOTESESSION, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN,
+    WH_MOUSE_LL, WM_MOUSEMOVE, WM_QUIT,
 };
 
 use crate::config::Config;
@@ -57,13 +57,14 @@ pub fn run(config: Config, options: RunOptions) {
     let now = Instant::now();
     let rdp_session = detect_rdp_session();
     let enabled_on_start = config.enabled_on_start;
-    if config.require_rdp && !rdp_session && !options.allow_local {
-        println!("未检测到 RDP 会话。使用 --no-rdp 或配置 require_rdp=false 可在本地桌面测试。");
+    if config.session_mode == "rdp" && !rdp_session && !options.allow_local {
+        println!("未检测到 RDP 会话。使用 --no-rdp 或配置 session_mode=any 可使用其他远控软件。");
     }
 
     let mut engine = CameraEngine::new(config.clone());
     engine.set_enabled(
-        config.enabled_on_start && (!config.require_rdp || rdp_session || options.allow_local),
+        config.enabled_on_start
+            && (config.session_mode != "rdp" || rdp_session || options.allow_local),
     );
     let runtime = Box::new(Runtime {
         config,
@@ -92,12 +93,13 @@ pub fn run(config: Config, options: RunOptions) {
         env!("CARGO_PKG_VERSION")
     );
     println!(
-        "backend=windows hook=WH_MOUSE_LL mode={} target=title+process",
+        "backend=windows hook=WH_MOUSE_LL mode={} target_scope={}",
         if runtime_ref().options.dry_run {
             "dry-run"
         } else {
             "inject"
-        }
+        },
+        runtime_ref().config.target_scope
     );
 
     let mut f8_was_down = false;
@@ -142,7 +144,9 @@ pub fn run(config: Config, options: RunOptions) {
 unsafe extern "system" fn mouse_hook(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     if code == HC_ACTION as i32 && wparam as u32 == WM_MOUSEMOVE && lparam != 0 {
         let event = unsafe { &*(lparam as *const MSLLHOOKSTRUCT) };
-        if event.flags & LLMHF_INJECTED == 0 {
+        // Ignore only our own SendInput events. Other remote-control clients
+        // commonly arrive through the same injected-input path.
+        if event.dwExtraInfo != INJECTED_TAG {
             let runtime = runtime_mut();
             if let Some(target) = runtime.target {
                 if target.id != 0 && unsafe { GetForegroundWindow() } as usize != target.id {
@@ -181,7 +185,10 @@ fn probe_target(now: Instant) {
     runtime.last_probe = now;
     let rdp_session = detect_rdp_session();
     if rdp_session != runtime.rdp_session && runtime.options.verbose {
-        println!("rdp_session={rdp_session}");
+        println!(
+            "rdp_session={rdp_session} session_mode={}",
+            runtime.config.session_mode
+        );
     }
     runtime.rdp_session = rdp_session;
     if target != runtime.target {
@@ -224,7 +231,9 @@ fn reload_config_if_changed(now: Instant) {
 
 fn sync_engine(runtime: &mut Runtime) {
     let allowed = runtime.user_enabled
-        && (!runtime.config.require_rdp || runtime.rdp_session || runtime.options.allow_local);
+        && (runtime.config.session_mode != "rdp"
+            || runtime.rdp_session
+            || runtime.options.allow_local);
     if allowed != runtime.engine.is_enabled() {
         runtime.engine.set_enabled(allowed);
     }

@@ -1,13 +1,13 @@
 [package]
 name = "remote-camera"
-version = "0.5.0"
+version = "0.6.0"
 edition = "2021"
 rust-version = "1.71"
-description = "A version-independent Windows companion for stable mouse input over Remote Desktop"
+description = "A version-independent Windows companion for stable mouse input over remote-control software"
 license = "MIT"
 repository = "https://github.com/HP-network/remote-camera"
 readme = "README.md"
-keywords = ["minecraft", "remote-desktop", "rdp", "mouse", "windows"]
+keywords = ["minecraft", "remote-control", "remote-desktop", "mouse", "windows"]
 categories = ["games", "os::windows-apis"]
 default-run = "remote-camera"
 

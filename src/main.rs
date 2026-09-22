@@ -12,14 +12,14 @@ use platform::RunOptions;
 
 fn print_help() {
     println!("Remote Camera {}", env!("CARGO_PKG_VERSION"));
-    println!("Windows companion for stable RDP desktop mouse input");
+    println!("Windows companion for stable remote-control mouse input");
     println!();
     println!("Usage: remote-camera [options]");
     println!("  --config <path>  use a specific config file");
     println!("  --print-config   print the effective configuration and exit");
     println!("  --dry-run        observe and filter input without injecting movement");
     println!("  --verbose        print target and runtime transitions");
-    println!("  --no-rdp         allow running outside an RDP session");
+    println!("  --no-rdp         compatibility alias for session_mode=any");
     println!("  -h, --help       show this help");
     println!("  -V, --version    show the version");
     println!();
@@ -64,6 +64,7 @@ fn main() {
         .unwrap_or_else(Config::load);
     if options.allow_local {
         config.require_rdp = false;
+        config.session_mode = "any".to_owned();
     }
     if print_config {
         print!("{}", config.to_text());

@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 pub struct Config {
     pub enabled_on_start: bool,
     pub require_rdp: bool,
+    pub session_mode: String,
     pub recenter_cursor: bool,
     pub target_scope: String,
     pub title_contains: String,
@@ -26,7 +27,8 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             enabled_on_start: true,
-            require_rdp: true,
+            require_rdp: false,
+            session_mode: "any".to_owned(),
             recenter_cursor: true,
             target_scope: "desktop".to_owned(),
             title_contains: "minecraft".to_owned(),
@@ -67,6 +69,12 @@ impl Config {
         let path = config.config_path.clone();
         match std::fs::read_to_string(&path) {
             Ok(contents) => {
+                let has_session_mode = contents
+                    .lines()
+                    .any(|line| line.trim_start().starts_with("session_mode="));
+                let has_legacy_session_mode = contents
+                    .lines()
+                    .any(|line| line.trim_start().starts_with("require_rdp="));
                 for (line_number, line) in contents.lines().enumerate() {
                     if let Err(error) = config.apply_line(line) {
                         eprintln!(
@@ -76,6 +84,10 @@ impl Config {
                             error
                         );
                     }
+                }
+                if !has_session_mode && !has_legacy_session_mode {
+                    config.session_mode = "any".to_owned();
+                    config.require_rdp = false;
                 }
             }
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
@@ -109,7 +121,7 @@ impl Config {
         let mut text = String::from("# Remote Camera configuration v2\n");
         let entries = [
             ("enabled_on_start", self.enabled_on_start.to_string()),
-            ("require_rdp", self.require_rdp.to_string()),
+            ("session_mode", self.session_mode.clone()),
             ("recenter_cursor", self.recenter_cursor.to_string()),
             ("target_scope", self.target_scope.clone()),
             ("title_contains", self.title_contains.clone()),
@@ -136,6 +148,11 @@ impl Config {
         if self.title_contains.is_empty() {
             self.title_contains = "minecraft".to_owned();
         }
+        self.session_mode = match self.session_mode.trim().to_ascii_lowercase().as_str() {
+            "rdp" | "rdp-only" | "rdp_only" => "rdp".to_owned(),
+            _ => "any".to_owned(),
+        };
+        self.require_rdp = self.session_mode == "rdp";
         self.target_scope = match self.target_scope.trim().to_ascii_lowercase().as_str() {
             "desktop" | "rdp" | "all" => "desktop".to_owned(),
             _ => "minecraft".to_owned(),
@@ -173,7 +190,15 @@ impl Config {
         let value = value.trim();
         match key {
             "enabled_on_start" => self.enabled_on_start = parse_bool(value)?,
-            "require_rdp" => self.require_rdp = parse_bool(value)?,
+            "require_rdp" => {
+                self.require_rdp = parse_bool(value)?;
+                self.session_mode = if self.require_rdp {
+                    "rdp".to_owned()
+                } else {
+                    "any".to_owned()
+                };
+            }
+            "session_mode" => self.session_mode = value.to_owned(),
             "recenter_cursor" => self.recenter_cursor = parse_bool(value)?,
             "target_scope" => self.target_scope = value.to_owned(),
             "title_contains" => self.title_contains = value.to_owned(),
@@ -282,6 +307,8 @@ mod tests {
     fn config_text_round_trips_core_values() {
         let original = Config {
             beta: 0.11,
+            require_rdp: true,
+            session_mode: "rdp".to_owned(),
             target_scope: "desktop".to_owned(),
             process_names: vec!["java.exe".to_owned()],
             ..Config::default()
@@ -292,6 +319,8 @@ mod tests {
         }
         parsed.sanitize();
         assert_eq!(parsed.beta, original.beta);
+        assert_eq!(parsed.session_mode, original.session_mode);
+        assert!(parsed.require_rdp);
         assert_eq!(parsed.target_scope, original.target_scope);
         assert_eq!(parsed.process_names, original.process_names);
     }
@@ -299,6 +328,8 @@ mod tests {
     #[test]
     fn new_install_defaults_to_desktop_scope() {
         assert_eq!(Config::default().target_scope, "desktop");
+        assert_eq!(Config::default().session_mode, "any");
+        assert!(!Config::default().require_rdp);
     }
 
     #[test]
