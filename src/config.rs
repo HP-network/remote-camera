@@ -32,7 +32,7 @@ impl Default for Config {
             recenter_cursor: true,
             target_scope: "desktop".to_owned(),
             title_contains: "minecraft".to_owned(),
-            process_names: vec!["javaw.exe".to_owned(), "java.exe".to_owned()],
+            process_names: default_process_names(),
             min_cutoff: 1.2,
             beta: 0.015,
             derivative_cutoff: 1.0,
@@ -161,7 +161,7 @@ impl Config {
             .filter(|name| !name.is_empty())
             .collect();
         if self.process_names.is_empty() {
-            self.process_names = vec!["javaw.exe".to_owned(), "java.exe".to_owned()];
+            self.process_names = default_process_names();
         }
         self.min_cutoff = finite_clamp(self.min_cutoff, 0.05, 30.0, 1.2);
         self.beta = finite_clamp(self.beta, 0.0, 2.0, 0.015);
@@ -216,6 +216,15 @@ impl Config {
         }
         Ok(())
     }
+}
+
+fn default_process_names() -> Vec<String> {
+    vec![
+        "javaw.exe".to_owned(),
+        "java.exe".to_owned(),
+        "minecraft.windows.exe".to_owned(),
+        "minecraft.exe".to_owned(),
+    ]
 }
 
 fn parse_bool(value: &str) -> Result<bool, String> {

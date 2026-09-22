@@ -330,7 +330,7 @@ fn is_target_window(window: HWND) -> bool {
     }
 
     // "minecraft" is the historical default, but localized launchers and
-    // custom clients often replace the window title entirely. The process
+    // Custom clients often replace the window title entirely. The process
     // filter is the default boundary; a custom title is opt-in.
     if runtime.config.title_contains.is_empty() || runtime.config.title_contains == "minecraft" {
         return true;
