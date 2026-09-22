@@ -30,7 +30,7 @@ Remote Camera 的兼容边界在 Windows 输入层，而不在 Minecraft 的 Jav
 
 ## 使用
 
-Windows x64 用户可以直接下载 [remote-camera.exe](https://github.com/HP-network/remote-camera/releases/download/v0.6.0/remote-camera.exe)，校验文件为 [remote-camera-windows-x64.sha256](https://github.com/HP-network/remote-camera/releases/download/v0.6.0/remote-camera-windows-x64.sha256)。
+Windows x64 用户可以直接下载 [remote-camera.exe](https://github.com/HP-network/remote-camera/releases/download/v0.6.1/remote-camera.exe)，校验文件为 [remote-camera-windows-x64.sha256](https://github.com/HP-network/remote-camera/releases/download/v0.6.1/remote-camera-windows-x64.sha256)。
 
 拓扑必须是：
 
@@ -72,7 +72,7 @@ recenter_settle_ms=3
 config_reload_secs=5
 ```
 
-`session_mode=any`（默认）兼容 RDP 和第三方远控软件；`session_mode=rdp` 才会强制要求 Windows RDP 会话。`require_rdp` 仍接受旧配置，但新配置请使用 `session_mode`。`min_cutoff` 控制低速平滑程度，`beta` 控制高速运动时提高响应的幅度；先调整 `deadzone`，再微调 `sensitivity`。不要把 `max_delta` 和 `max_output` 设得过大，否则会重新放大远程桌面的跳变。
+`session_mode=any`（默认）兼容 RDP 和第三方远控软件；`session_mode=rdp` 才会强制要求 Windows RDP 会话。`require_rdp` 仍接受旧配置，但没有 `session_mode` 的旧文件会迁移为 `any`；新配置请使用 `session_mode`。`min_cutoff` 控制低速平滑程度，`beta` 控制高速运动时提高响应的幅度；先调整 `deadzone`，再微调 `sensitivity`。不要把 `max_delta` 和 `max_output` 设得过大，否则会重新放大远程桌面的跳变。
 
 `target_scope=desktop` 使用当前 Windows 虚拟桌面的中心点，不检查窗口标题和 Java 进程。它是默认模式，会影响被控端当前会话里的其他桌面应用，按 F8 可立即停用。需要只处理 Minecraft 时改为 `target_scope=minecraft`。
 
@@ -138,7 +138,7 @@ Remote Camera is a standalone Windows companion for unstable mouse input on a co
 
 This is **not a Minecraft mod**. It does not require Fabric, Forge, NeoForge, LiteLoader, or a particular game version. It works outside the JVM and targets the Windows desktop input path, so the same executable can be used across Java Edition versions as long as the foreground window title contains `Minecraft`.
 
-Download the Windows x64 executable from the [v0.6.0 release](https://github.com/HP-network/remote-camera/releases/tag/v0.6.0) and verify it with the published SHA-256 file.
+Download the Windows x64 executable from the [v0.6.1 release](https://github.com/HP-network/remote-camera/releases/tag/v0.6.1) and verify it with the published SHA-256 file.
 
 Run `remote-camera.exe` on the **controlled Windows host where Minecraft runs**, inside the same interactive user session. Running it on the controlling/client computer cannot intercept input delivered to the controlled host.
 

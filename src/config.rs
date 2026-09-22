@@ -72,9 +72,6 @@ impl Config {
                 let has_session_mode = contents
                     .lines()
                     .any(|line| line.trim_start().starts_with("session_mode="));
-                let has_legacy_session_mode = contents
-                    .lines()
-                    .any(|line| line.trim_start().starts_with("require_rdp="));
                 for (line_number, line) in contents.lines().enumerate() {
                     if let Err(error) = config.apply_line(line) {
                         eprintln!(
@@ -85,7 +82,7 @@ impl Config {
                         );
                     }
                 }
-                if !has_session_mode && !has_legacy_session_mode {
+                if !has_session_mode {
                     config.session_mode = "any".to_owned();
                     config.require_rdp = false;
                 }
@@ -330,6 +327,23 @@ mod tests {
         assert_eq!(Config::default().target_scope, "desktop");
         assert_eq!(Config::default().session_mode, "any");
         assert!(!Config::default().require_rdp);
+    }
+
+    #[test]
+    fn legacy_config_migrates_to_any_session() {
+        let path = std::env::temp_dir().join(format!(
+            "remote-camera-config-{}-{}.cfg",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::write(&path, "require_rdp=true\ntarget_scope=desktop\n").unwrap();
+        let config = config_from_path(&path);
+        let _ = std::fs::remove_file(path);
+        assert_eq!(config.session_mode, "any");
+        assert!(!config.require_rdp);
     }
 
     #[test]
