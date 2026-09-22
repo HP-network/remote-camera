@@ -15,11 +15,11 @@ use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
     MOUSEEVENTF_MOVE_NOCOALESCE, MOUSEINPUT, VK_F8, VK_F9,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    CallNextHookEx, DispatchMessageW, GetClientRect, GetForegroundWindow, GetSystemMetrics,
-    GetWindowTextW, GetWindowThreadProcessId, PeekMessageW, SetCursorPos, SetWindowsHookExW,
-    TranslateMessage, UnhookWindowsHookEx, HC_ACTION, HHOOK, MSG, MSLLHOOKSTRUCT, PM_REMOVE,
-    SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_REMOTESESSION, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN,
-    WH_MOUSE_LL, WM_MOUSEMOVE, WM_QUIT,
+    CallNextHookEx, DispatchMessageW, EnumWindows, GetClientRect, GetForegroundWindow,
+    GetSystemMetrics, GetWindowRect, GetWindowTextW, GetWindowThreadProcessId, IsWindowVisible,
+    PeekMessageW, SetCursorPos, SetWindowsHookExW, TranslateMessage, UnhookWindowsHookEx,
+    HC_ACTION, HHOOK, MSG, MSLLHOOKSTRUCT, PM_REMOVE, SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN,
+    SM_REMOTESESSION, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN, WH_MOUSE_LL, WM_MOUSEMOVE, WM_QUIT,
 };
 
 use crate::config::Config;
@@ -179,8 +179,8 @@ unsafe extern "system" fn mouse_hook(code: i32, wparam: WPARAM, lparam: LPARAM) 
 }
 
 fn probe_target(now: Instant) {
-    let window = unsafe { GetForegroundWindow() };
-    let target = window_target(window);
+    let foreground = unsafe { GetForegroundWindow() };
+    let target = window_target(foreground);
     let runtime = runtime_mut();
     runtime.last_probe = now;
     let rdp_session = detect_rdp_session();
@@ -195,14 +195,16 @@ fn probe_target(now: Instant) {
         runtime.target = target;
         let changed = runtime.engine.target_changed(target);
         if changed && runtime.options.verbose {
-            println!(
-                "target={}",
-                if target.is_some() {
-                    runtime.config.target_scope.as_str()
-                } else {
-                    "none"
-                }
-            );
+            if let Some(target) = target {
+                let process = window_process_name(target.id as HWND).unwrap_or_else(|| "?".into());
+                let title = window_title(target.id as HWND).unwrap_or_default();
+                println!(
+                    "target={} hwnd=0x{:x} process={} title={:?}",
+                    runtime.config.target_scope, target.id, process, title
+                );
+            } else {
+                println!("target=none");
+            }
         }
     }
     sync_engine(runtime);
@@ -244,9 +246,39 @@ fn window_target(window: HWND) -> Option<TargetWindow> {
     if runtime.config.target_scope == "desktop" {
         return virtual_desktop_target();
     }
-    if window.is_null() || !is_target_window(window) {
-        return None;
+    // The foreground window is the common case. Some remote-control clients
+    // briefly report a helper window, so fall back to a visible top-level
+    // window owned by an allowed game process.
+    if !window.is_null() && is_target_window(window) {
+        return target_from_window(window);
     }
+    let mut candidates = Vec::new();
+    unsafe {
+        EnumWindows(
+            Some(collect_target_window),
+            &mut candidates as *mut _ as LPARAM,
+        );
+    }
+    candidates.into_iter().next().and_then(target_from_window)
+}
+
+unsafe extern "system" fn collect_target_window(window: HWND, lparam: LPARAM) -> i32 {
+    if unsafe { IsWindowVisible(window) } == 0 || !is_target_window(window) {
+        return 1;
+    }
+    let mut rect = RECT::default();
+    if unsafe { GetWindowRect(window, &mut rect) } == 0
+        || rect.right - rect.left < 100
+        || rect.bottom - rect.top < 100
+    {
+        return 1;
+    }
+    let candidates = unsafe { &mut *(lparam as *mut Vec<HWND>) };
+    candidates.push(window);
+    1
+}
+
+fn target_from_window(window: HWND) -> Option<TargetWindow> {
     let mut rect = RECT::default();
     if unsafe { GetClientRect(window, &mut rect) } == 0 {
         return None;
@@ -285,11 +317,7 @@ fn is_target_window(window: HWND) -> bool {
     if runtime.config.target_scope == "desktop" {
         return true;
     }
-    let mut pid = 0;
-    if unsafe { GetWindowThreadProcessId(window, &mut pid) } == 0 {
-        return false;
-    }
-    let Some(name) = process_name(pid) else {
+    let Some(name) = window_process_name(window) else {
         return false;
     };
     if !runtime
@@ -302,19 +330,32 @@ fn is_target_window(window: HWND) -> bool {
     }
 
     // "minecraft" is the historical default, but localized launchers and
-    // custom clients often replace the window title entirely. The Java
-    // process filter is the reliable boundary in that case. A non-default
-    // title remains available as an explicit stricter filter.
-    if runtime.config.title_contains == "minecraft" {
+    // custom clients often replace the window title entirely. The process
+    // filter is the default boundary; a custom title is opt-in.
+    if runtime.config.title_contains.is_empty() || runtime.config.title_contains == "minecraft" {
         return true;
     }
+    window_title(window)
+        .map(|title| {
+            title
+                .to_ascii_lowercase()
+                .contains(&runtime.config.title_contains)
+        })
+        .unwrap_or(false)
+}
+
+fn window_process_name(window: HWND) -> Option<String> {
+    let mut pid = 0;
+    if unsafe { GetWindowThreadProcessId(window, &mut pid) } == 0 {
+        return None;
+    }
+    process_name(pid)
+}
+
+fn window_title(window: HWND) -> Option<String> {
     let mut title = [0u16; 512];
     let length = unsafe { GetWindowTextW(window, title.as_mut_ptr(), title.len() as i32) };
-    if length <= 0 {
-        return false;
-    }
-    let title = String::from_utf16_lossy(&title[..length as usize]).to_ascii_lowercase();
-    runtime.config.title_contains.is_empty() || title.contains(&runtime.config.title_contains)
+    (length > 0).then(|| String::from_utf16_lossy(&title[..length as usize]))
 }
 
 fn process_name(pid: u32) -> Option<String> {
