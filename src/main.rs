@@ -3,6 +3,7 @@ mod config;
 mod engine;
 #[cfg_attr(not(windows), allow(dead_code))]
 mod filter;
+mod geometry;
 mod platform;
 
 use std::path::PathBuf;

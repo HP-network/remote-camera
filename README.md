@@ -23,6 +23,7 @@ Remote Camera 的兼容边界在 Windows 输入层，而不在 Minecraft 的游�
 - deadzone 去除远控微抖，max delta / max output 限制瞬时跳变
 - Minecraft 模式检查前台或可见顶层 Java/Bedrock 窗口；可选地检查自定义窗口标题
 - 窗口切换、会话变化、配置变化都会重置状态机
+- 回中优先使用 Windows 当前 `ClipCursor` 区域，其次使用 Minecraft 客户区中心，最后才使用虚拟桌面中心，避免窗口化游戏被回到屏幕外或远控边缘
 - 配置文件热加载，出错字段单独忽略，不会破坏其他设置
 - `--dry-run` 只观察和过滤，不注入、不吞鼠标事件
 - `--verbose` 输出 target、会话和配置状态变化
@@ -74,7 +75,9 @@ config_reload_secs=5
 
 `session_mode=any`（默认）兼容 RDP 和第三方远控软件；`session_mode=rdp` 才会强制要求 Windows RDP 会话。`require_rdp` 仍接受旧配置，但没有 `session_mode` 的旧文件会迁移为 `any`；新配置请使用 `session_mode`。`min_cutoff` 控制低速平滑程度，`beta` 控制高速运动时提高响应的幅度；先调整 `deadzone`，再微调 `sensitivity`。不要把 `max_delta` 和 `max_output` 设得过大，否则会重新放大远程桌面的跳变。
 
-`target_scope=desktop` 使用当前 Windows 虚拟桌面的中心点，不检查窗口标题和 Java 进程。它是默认模式，会影响被控端当前会话里的其他桌面应用，按 F8 可立即停用。需要只处理 Minecraft 时改为 `target_scope=minecraft`。
+`target_scope=desktop` 仍然处理当前 Windows 交互式桌面，不检查窗口标题和 Java 进程；回中坐标会按当前裁剪区域、前台游戏客户区和虚拟桌面顺序选择。它是默认模式，会影响被控端当前会话里的其他桌面应用，按 F8 可立即停用。需要只处理 Minecraft 时改为 `target_scope=minecraft`。
+
+当 Minecraft 或远控软件启用了光标裁剪时，工具会读取 `ClipCursor` 的实际区域并把回中点放在该区域中心；没有裁剪区域时，若前台是 Java/Bedrock 客户端则使用客户区中心。用 `--verbose` 可以看到 `center=(x, y)`，确认回中坐标是否落在游戏窗口内。
 
 ## 架构
 
@@ -143,6 +146,8 @@ Download the Windows x64 executable from the [v0.6.5 release](https://github.com
 Run `remote-camera.exe` on the **controlled Windows host where Minecraft runs**, inside the same interactive user session. Running it on the controlling/client computer cannot intercept input delivered to the controlled host.
 
 Press F8 to toggle the filter and F9 to exit. The default configuration is `%APPDATA%\\RemoteCamera\\config.cfg`; `session_mode=any` supports RDP and third-party remote-control clients, while `session_mode=rdp` is strict. The default `target_scope=desktop` covers the interactive desktop; use `target_scope=minecraft` for a game-only filter. `--dry-run`, `--verbose`, and `--print-config` are available for diagnosis. Build with `cargo build --release --locked` on Windows. The non-Windows build is a harmless stub for tests and documentation only.
+
+Recent versions choose the recenter point from the active Windows `ClipCursor` region first, then the Minecraft client area, and only then the virtual desktop. Run with `--verbose` to inspect the selected `center=(x, y)` while diagnosing an edge-stuck cursor.
 
 ## 限制
 

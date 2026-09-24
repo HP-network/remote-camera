@@ -15,15 +15,17 @@ use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
     MOUSEEVENTF_MOVE_NOCOALESCE, MOUSEINPUT, VK_F8, VK_F9,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    CallNextHookEx, DispatchMessageW, EnumWindows, GetClientRect, GetForegroundWindow,
-    GetSystemMetrics, GetWindowRect, GetWindowTextW, GetWindowThreadProcessId, IsWindowVisible,
-    PeekMessageW, SetCursorPos, SetWindowsHookExW, TranslateMessage, UnhookWindowsHookEx,
-    HC_ACTION, HHOOK, MSG, MSLLHOOKSTRUCT, PM_REMOVE, SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN,
-    SM_REMOTESESSION, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN, WH_MOUSE_LL, WM_MOUSEMOVE, WM_QUIT,
+    CallNextHookEx, DispatchMessageW, EnumWindows, GetClientRect, GetClipCursor,
+    GetForegroundWindow, GetSystemMetrics, GetWindowRect, GetWindowTextW, GetWindowThreadProcessId,
+    IsWindowVisible, PeekMessageW, SetCursorPos, SetWindowsHookExW, TranslateMessage,
+    UnhookWindowsHookEx, HC_ACTION, HHOOK, MSG, MSLLHOOKSTRUCT, PM_REMOVE, SM_CXVIRTUALSCREEN,
+    SM_CYVIRTUALSCREEN, SM_REMOTESESSION, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN, WH_MOUSE_LL,
+    WM_MOUSEMOVE, WM_QUIT,
 };
 
 use crate::config::Config;
 use crate::engine::{CameraEngine, EngineState, TargetWindow};
+use crate::geometry::{recenter_point, Bounds};
 use crate::platform::RunOptions;
 
 static RUNTIME: OnceLock<usize> = OnceLock::new();
@@ -209,8 +211,13 @@ fn probe_target(now: Instant) {
                 let process = window_process_name(target.id as HWND).unwrap_or_else(|| "?".into());
                 let title = window_title(target.id as HWND).unwrap_or_default();
                 println!(
-                    "target={} hwnd=0x{:x} process={} title={:?}",
-                    runtime.config.target_scope, target.id, process, title
+                    "target={} hwnd=0x{:x} process={} title={:?} center=({}, {})",
+                    runtime.config.target_scope,
+                    target.id,
+                    process,
+                    title,
+                    target.center_x,
+                    target.center_y
                 );
             } else {
                 println!("target=none");
@@ -289,25 +296,30 @@ unsafe extern "system" fn collect_target_window(window: HWND, lparam: LPARAM) ->
 }
 
 fn target_from_window(window: HWND) -> Option<TargetWindow> {
-    let mut rect = RECT::default();
-    if unsafe { GetClientRect(window, &mut rect) } == 0 {
-        return None;
-    }
-    let mut center = POINT {
-        x: (rect.right - rect.left) / 2,
-        y: (rect.bottom - rect.top) / 2,
-    };
-    if unsafe { ClientToScreen(window, &mut center) } == 0 {
-        return None;
-    }
+    let center = recenter_point(
+        clipped_bounds(),
+        client_bounds(window),
+        virtual_desktop_bounds()?,
+    )?;
     Some(TargetWindow {
         id: window as usize,
-        center_x: center.x,
-        center_y: center.y,
+        center_x: center.0,
+        center_y: center.1,
     })
 }
 
 fn virtual_desktop_target() -> Option<TargetWindow> {
+    let desktop = virtual_desktop_bounds()?;
+    let game_window = foreground_game_bounds();
+    let center = recenter_point(clipped_bounds(), game_window, desktop)?;
+    Some(TargetWindow {
+        id: 0,
+        center_x: center.0,
+        center_y: center.1,
+    })
+}
+
+fn virtual_desktop_bounds() -> Option<Bounds> {
     let width = unsafe { GetSystemMetrics(SM_CXVIRTUALSCREEN) };
     let height = unsafe { GetSystemMetrics(SM_CYVIRTUALSCREEN) };
     if width <= 0 || height <= 0 {
@@ -315,11 +327,60 @@ fn virtual_desktop_target() -> Option<TargetWindow> {
     }
     let left = unsafe { GetSystemMetrics(SM_XVIRTUALSCREEN) };
     let top = unsafe { GetSystemMetrics(SM_YVIRTUALSCREEN) };
-    Some(TargetWindow {
-        id: 0,
-        center_x: left.saturating_add(width / 2),
-        center_y: top.saturating_add(height / 2),
+    Some(Bounds {
+        left,
+        top,
+        right: left.saturating_add(width),
+        bottom: top.saturating_add(height),
     })
+}
+
+fn clipped_bounds() -> Option<Bounds> {
+    let mut rect = RECT::default();
+    if unsafe { GetClipCursor(&mut rect) } == 0 {
+        return None;
+    }
+    Some(Bounds {
+        left: rect.left,
+        top: rect.top,
+        right: rect.right,
+        bottom: rect.bottom,
+    })
+}
+
+fn client_bounds(window: HWND) -> Option<Bounds> {
+    let mut rect = RECT::default();
+    if unsafe { GetClientRect(window, &mut rect) } == 0 {
+        return None;
+    }
+    let mut top_left = POINT {
+        x: rect.left,
+        y: rect.top,
+    };
+    let mut bottom_right = POINT {
+        x: rect.right,
+        y: rect.bottom,
+    };
+    if unsafe { ClientToScreen(window, &mut top_left) } == 0
+        || unsafe { ClientToScreen(window, &mut bottom_right) } == 0
+    {
+        return None;
+    }
+    Some(Bounds {
+        left: top_left.x,
+        top: top_left.y,
+        right: bottom_right.x,
+        bottom: bottom_right.y,
+    })
+}
+
+fn foreground_game_bounds() -> Option<Bounds> {
+    let window = unsafe { GetForegroundWindow() };
+    let name = window_process_name(window)?;
+    if !runtime_ref().config.process_names.contains(&name) {
+        return None;
+    }
+    client_bounds(window)
 }
 
 fn is_target_window(window: HWND) -> bool {
